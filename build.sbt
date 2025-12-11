@@ -50,8 +50,8 @@ lazy val commonSettings = Seq(
     "-ea",
   ),
   libraryDependencies ++= Seq(
-    "org.slf4j" % "slf4j-api" % "2.0.13",
-    "org.slf4j" % "slf4j-log4j12" % "2.0.13" % Test,
+    "org.slf4j" % "slf4j-api" % "2.0.17",
+    "org.slf4j" % "slf4j-log4j12" % "2.0.17" % Test,
     "org.apache.logging.log4j" % "log4j-slf4j2-impl" % log4jVersion,
     "org.apache.logging.log4j" % "log4j-api" % log4jVersion
   ),
@@ -169,7 +169,7 @@ lazy val controlApi = (project in file("target/control/java"))
     }
   )
 
-lazy val client = (project in file("clients/java"))
+lazy val client = (project in file("target/clients/java"))
   .enablePlugins(OpenApiGeneratorPlugin)
   .settings(
     name := s"$artifactNamePrefix-client",
@@ -177,8 +177,6 @@ lazy val client = (project in file("clients/java"))
     javaOnlyReleaseSettings,
     Compile / compile / javacOptions ++= javacRelease11,
     javaCheckstyleTestOnlySettings("dev/checkstyle-config.xml"),
-    // Include generated OpenAPI sources
-    Compile / unmanagedSourceDirectories += (file(".") / "clients" / "java" / "target" / "src" / "main" / "java"),
     libraryDependencies ++= Seq(
       "com.fasterxml.jackson.core" % "jackson-annotations" % jacksonVersion,
       "com.fasterxml.jackson.core" % "jackson-core" % jacksonVersion,
@@ -189,9 +187,6 @@ lazy val client = (project in file("clients/java"))
       "jakarta.annotation" % "jakarta.annotation-api" % "3.0.0" % Provided,
 
       // Test dependencies
-      "org.mockito" % "mockito-core" % "5.11.0" % Test,
-      "org.mockito" % "mockito-inline" % "5.2.0" % Test,
-      "org.mockito" % "mockito-junit-jupiter" % "5.12.0" % Test,
       "org.junit.jupiter" % "junit-jupiter" % "5.10.3" % Test,
       "net.aichler" % "jupiter-interface" % JupiterKeys.jupiterVersion.value % Test,
       "org.assertj" % "assertj-core" % "3.26.3" % Test,
@@ -204,7 +199,7 @@ lazy val client = (project in file("clients/java"))
     // OpenAPI generation specs
     openApiInputSpec := (file(".") / "api" / "all.yaml").toString,
     openApiGeneratorName := "java",
-    openApiOutputDir := (file(".") / "clients" / "java" / "target").toString,
+    openApiOutputDir := (file("target") / "clients" / "java").toString,
     openApiApiPackage := s"$orgName.client.api",
     openApiModelPackage := s"$orgName.client.model",
     openApiAdditionalProperties := Map(
@@ -217,6 +212,8 @@ lazy val client = (project in file("clients/java"))
     openApiGenerateModelTests := SettingDisabled,
     openApiGenerateApiDocumentation := SettingDisabled,
     openApiGenerateModelDocumentation := SettingDisabled,
+    // Use custom Mustache templates for ApiClient customization
+    openApiTemplateDir := (file(".") / "clients" / "java" / "openapi-templates").toString,
     // Define the simple generate command to generate full client codes
     generate := {
       val _ = openApiGenerate.value
@@ -572,19 +569,6 @@ lazy val spark = (project in file("connectors/spark"))
     ),
     javaCheckstyleSettings("dev/checkstyle-config.xml"),
     Compile / compile / javacOptions ++= javacRelease11,
-    Test / compile / javacOptions := {
-      // lombok is only a dependency of test. So its path needs to be added explicitly.
-      val lombokPath = (Test / dependencyClasspath).value
-        .files
-        .filter(_.getName.contains("lombok"))
-        .mkString(File.pathSeparator)
-      javacRelease11 ++ Seq(
-        "-processor",
-        "lombok.launch.AnnotationProcessorHider$AnnotationProcessor",
-        "-processorpath",
-        lombokPath
-      )
-    },
     libraryDependencies ++= Seq(
       "org.apache.spark" %% "spark-sql" % sparkVersion % Provided,
       "com.fasterxml.jackson.core" % "jackson-databind" % "2.15.0",
@@ -608,7 +592,6 @@ lazy val spark = (project in file("connectors/spark"))
       "net.aichler" % "jupiter-interface" % JupiterKeys.jupiterVersion.value % Test,
       "org.apache.hadoop" % "hadoop-client-runtime" % hadoopVersion,
       "org.apache.hadoop" % "hadoop-aws" % hadoopVersion % Test,
-      "org.projectlombok" % "lombok" % "1.18.32" % Test,
       "com.google.cloud.bigdataoss" % "gcs-connector" % "3.0.2" % Test classifier "shaded",
       "io.delta" %% "delta-spark" % deltaVersion % Test,
     ),
